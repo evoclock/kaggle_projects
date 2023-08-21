@@ -1,8 +1,83 @@
-# This is a continuation of the EDA and model testing for credit risk analysis.
-# The reason for branching at this point is that I did not feel that KNN imputation of datetime data was justifiable and so 
-# to avoid the clutter will continue here
-# Julen Gamboa
-# j.a.r.gamboa@gmail.com
+---
+title: "Credit Risk Analysis"
+author: "Julen Gamboa"
+date: "21 August 2023"
+format: 
+  html:
+    theme: minty
+jupyter: python3
+---
+
+# Aim
+The aim of this analysis is to determine credit risk based on customer behaviour regarding engagement with financial products as well as a variety of demographic attributes that may be informative.
+
+It's worth noting that the dataset already contains information about credit risk
+
+## Data source
+
+In this analysis I'm using a **Kaggle credit risk dataset** described [here](https://www.kaggle.com/datasets/praveengovi/credit-risk-classification-dataset)
+
+
+The data is structured in two csv files:
+
+:::{}
+1. File 1 - **Payment data** contains customer's credit card payment history and has the following fields:
+- id: customer id
+- OVD_t1: number of times overdue type 1
+- OVD_t2: number of times overdue type 2
+- OVD_t3: number of times overdue type 3
+- OVD_sum: total overdue days
+- pay_normal: number of times normal payment
+- prod_code: credit product code
+- prod_limit: credit limit of product
+- update_date: account update date
+- new_balance: current balance of product
+- highest_balance: highest balance in history
+- report_date: date of recent payment
+:::
+
+:::{}
+2. File 2 - **Customer data** which contains demographic data and category attributes that have been anonymised as follows:
+- id
+- label:  if it equals 1 it indicates the customer is high risk, if it equals 0 the customer is low risk
+- fea_1
+- fea_2
+- fea_3
+- fea_4
+- fea_5
+- fea_6
+- fea_7
+- fea_8
+- fea_9
+- fea_10
+- fea_11
+:::
+
+## Methodology
+
+```{mermaid}
+flowchart LR
+  A[Input data] --> B(EDA)
+  B --> C{Analysis proper}
+  C --> D[ML methods]
+  D --> F{Logistic Regression}
+  D --> G{Naive Bayes}
+  D --> H{Decision Tree Classifier}
+  D --> I{XGBoost}
+  C --> E[Neural Network]
+  E --> J{Accuracy assessment}
+  F --> J{Accuracy assessment}
+  G --> J{Accuracy assessment}
+  H --> J{Accuracy assessment}
+  I --> J{Accuracy assessment}
+  J --> K{Reporting}
+  K --> L{Select best two methods}
+  L --> M{Compare common and unique predictions}
+```
+
+### Input data pre-processing
+```{python}
+#| echo: false
 
 import pandas as pd
 import numpy as np
@@ -57,58 +132,29 @@ merged_df[cols] = merged_df[cols].round()
 for i in cols:
     merged_df[i] = impute.fit_transform(merged_df[[i]])
 
+x = merged_df.drop(columns=['label'],axis=1)
+y = merged_df['label']
+merged_df.drop(columns=['label'], axis=1, inplace=True)
+```
 
-# Deprecated because frankly the options to create a facet plot with invariant scale using the tidyverse are
-# (unsurprisingly) superior to anything in Python
+### Note:
+After some standard pre-processing (renaming columns, concatenating data frames, and checking for missing data) I decided that data imputation was not appropriate while low credit risk customers might pay their full balance or higher amounts consistently on the same date, high risk customers would exhibit far more variance on both the date of balance closing and last payments made. I personally feel the variable 'pay_normal' (i.e. the number of times a customer does not default on payments) captures this information in a discretised manner that does not rely on following a Poisson distribution of events.
 
-#output_directory = os.path.expanduser('~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/Figures/')
+In short, I have decided that dropping update_date, and report_date variables was justified. I did however use KNN imputation to fill missing values for feature_2, prod_limit (the credit limit), and highest_balance features, the data for feature 2 appears to be normally distributed, while the prod_limit appears to be close to normally distributed but has a small number of outliers. The highest_balance variable exhibits most values centered close to zero but extremely long tail all the way out  to 150,000,000. 
 
-# for i in merged_df.columns:
-#     p = (ggplot(merged_df, aes(x=1, y=i))
-#          + geom_violin(fill="#21918c", alpha=0.6)
-#          + theme_minimal()
-#          + labs(title=f'Distribution of {i}', x='', y=i)
-#          + theme_minimal()  # You can customize the theme here
-#          + theme(figure_size=(6, 4)))  # Adjust the figure size here
-    
-#     # Generate the filename
-#     filename = f"{output_directory}03_{i}_dist.jpeg"
-    
-#     # Save the plot to the specified filename with a lower dpi
-#     p.save(filename, dpi=150)
+##### No missing values present after pre-processing
+```{python}
+merged_df.info()
+```
 
-#     print(f"Plot saved to: {filename}")
 
-#############################################
-############### Corr Plot ###################
+It would be good to visualise how the different variables correlate with one another.
 
-# Generate the correlation matrix and plot
-# There's two options I have found using plotnine, the first below (commented out) 
-# has issues adjusting the opacity of the legend but the syntax is the most tidyverse like.
-# The second option utilises a tidyverse approach (using .melt()) to transform the data into long format
-# prior to plotting, it maps the three columns (var1, var2, and value) to the aes geom before
-# beautifying the plot with labels (in this case I filtered values above 0.1 but remove values that
-# equal 1 since they would lie on the diagonal and it is of course not informative)
-# The second option is less tidyverse like in syntax but it isn't impossible to get used to if you
-# are coming from
+*Technical note: The plot was generated with plotnine following Tidyverse principles which I find to be superior to Python libraries*
 
-#from plotnine import ggplot, aes, geom_tile, scale_fill_cmap, scale_alpha_manual, theme_minimal, labs
-#
-#corr_matrix = merged_df.corr()
-#mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
-#
-# Generate a mask to print only the lower triangle
-#mask = np.tril(np.ones_like(corr_matrix, dtype=bool))
-#
-#heatmap3 = (ggplot(pd.melt(corr_matrix.reset_index(), id_vars='index'), aes(x='index', y='variable', fill='value'))
-#           + geom_tile(alpha=0.9)  # Adjust opacity using the 'alpha' parameter
-#           + scale_fill_cmap(cmap_name='viridis', name="Correlation")
-#           + theme_minimal()
-#           labs(title="Correlation Heatmap Merged Data", x="", y=""))
-#
-#heatmap3 += theme(axis_text_x=element_text(rotation=60, hjust=1)) 
-#print(heatmap3)
-
+```{python}
+#| echo: false
+#| fig-cap: "Correlation between different variables in the credit risk customer dataset"
 
 import plotnine as p9
 from plotnine import aes, geom_tile, geom_label, scale_fill_cmap, theme_minimal, labs, element_text
@@ -158,19 +204,26 @@ labs(
 p9.theme(
     axis_text_x=element_text(rotation=70, hjust=1),
     figure_size=(8, 6)
-)) 
+))
+```
 
-# Drop the 'label' column from merged_df and store it as the y variable for our model
-x = merged_df.drop(columns=['label'],axis=1)
-y = merged_df['label']
-merged_df.drop(columns=['label'], axis=1, inplace=True)
+## Analyses
 
-# Check
-ans = merged_df.columns
-print(ans)
+First thing here is to store the label used to classify a customer as high or low credit risk and store it
+as the response variable for all our models while keeping everything else as our predictor variables
 
-# Time to train some models
 
+### ML methods
+
+Four methods will be used, Logistic Regression (LR), Naive Bayes (NB), a Decision Tree Classifier (DT), and XGBoost (XGB).
+The dataset is split into training and test sets, **70%** is kept for the training set and **30%** will be used as a test set.
+
+Hyperparameter tuning was performed for both the DT and XGB models
+
+The code is not shown but the prediction accuracy is reported below
+
+```{python}
+#| echo: false
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
@@ -186,34 +239,23 @@ lr = LogisticRegression()
 lr.fit(X_train,Y_train)
 Y_pred_lr = lr.predict(X_test)
 
-# return the dimensions of the array
-print(Y_pred_lr.shape)
-# (2475,)
+
 
 # Calculate the accuracy score between prediction and the test data
 score_lr = round(accuracy_score(Y_pred_lr,Y_test)*100, 2)
-print("The accuracy score achieved using Logistic Regression is: "+str(score_lr)+" %")
-# The accuracy score achieved using Logistic Regression is: 83.64 %
 
+###############################
 ###### Naive Bayes model ######
 nb = GaussianNB()
 nb.fit(X_train,Y_train)
 Y_pred_nb = nb.predict(X_test)
 
-# dimensions of the array
-print(Y_pred_nb.shape)
-# (2475,)
 
 # Naive Bayes accuracy score
 score_nb = round(accuracy_score(Y_pred_nb,Y_test)*100, 2)
-print("The accuracy score achieved using Naive Bayes is: "+str(score_nb)+" %")
-# The accuracy score achieved using Naive Bayes is: 82.75 %
 
 ######################################
 ###### Decision Tree Classifier ######
-import pickle
-with open('dt_model.pkl', 'wb') as f:
-    pickle.dump(dt, f)
 
 # initialise the max accuracy object for hyperparameter tuning
 max_accuracy = 0
@@ -227,8 +269,8 @@ for x in range(200):
     if(current_accuracy>max_accuracy):
         max_accuracy = current_accuracy
         best_x = x
-        
-print(max_accuracy)
+
+print("Best random state after hyperparameter tuning for the Decision Tree Classifier") 
 print(best_x)
 
 # train the model with the best random state
@@ -236,22 +278,16 @@ dt = DecisionTreeClassifier(random_state=best_x)
 dt.fit(X_train,Y_train)
 Y_pred_dt = dt.predict(X_test)
 
-# dimensions of the array
-print(Y_pred_dt.shape)
-# (2475,)
-
 # calculate the accuracy
 score_dt = round(accuracy_score(Y_pred_dt,Y_test)*100, 2)
-print("The accuracy score achieved using Decision Tree is: "+str(score_dt)+" %")
-# The accuracy score achieved using Decision Tree is: 97.94 %
-
-# Save the model locally for latter use
-import pickle
-with open('dt_model.pkl', 'wb') as f:
-    pickle.dump(dt, f)
 
 #####################
 ###### XGBoost XXXXXX
+
+# Save the initial XGBoost model
+import pickle
+with open('model.pkl', 'wb') as f:
+    pickle.dump(dt, f)
 import xgboost as xgb
 
 # Initialize the max accuracy object for hyperparameter tuning
@@ -266,35 +302,51 @@ for x in range(200):
     if current_accuracy_xgb > max_accuracy_xgb:
         max_accuracy_xgb = current_accuracy_xgb
         best_x_xgb = x
-        
-# print(max_accuracy_xgb)
+
+print("Best random state after hyperparameter tuning for XGBoost")       
 print(best_x_xgb)
-# 0
+
 
 # train the model with the best random state
 xgb_model = xgb.XGBClassifier(objective="binary:logistic", random_state=0)
 xgb_model.fit(X_train, Y_train)
 Y_pred_xgb = xgb_model.predict(X_test)
 
-# dimensions of the array
-Y_pred_xgb.shape
-# (2475,)
 
 # calculate the accuracy
 score_xgb = round(accuracy_score(Y_pred_xgb,Y_test)*100, 2)
-print("The accuracy score achieved using XGBoost is: "+str(score_xgb)+" %")
-# The accuracy score achieved using XGBoost is: 98.46 %
 
 # save the trained XGBoost model
 import pickle
-with open('xgb_model.pkl', 'wb') as f:
+with open('model2.pkl', 'wb') as f:
     pickle.dump(xgb_model, f)
+```
 
-##########################
-##### Neural Network #####
+### Accuracy of the ML model predictions
+```{python}
+#| echo: false
+scores = [score_lr,score_nb,score_dt,score_xgb]
+algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost"]    
+
+for i in range(len(algorithms)):
+    print("The accuracy score achieved using "+algorithms[i]+" is: "+str(scores[i])+" %")
+```
+
+### Neural Network approach
+
+I have used a NN model with a full connected hidden layer containing 11 units and ReLu as activation function. The output layer is configured for binary classification.
+
+The model was trained for 3,000 epochs before carrying out predictions on the test set. 
+
+```{python}
+#| echo: false
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
+
 
 # Build the NN model
 model = Sequential()
@@ -312,27 +364,28 @@ model.fit(X_train, Y_train, epochs=3000)
 
 # Make predictions on the test data with our trained model
 Y_pred_nn = model.predict(X_test)
+```
 
-# Calculate the accuracy of the predictions
+
+#### Accuracy of the NN model predictions
+
+```{python}
+#| echo: false
 rounded = [round(x[0]) for x in Y_pred_nn]
 Y_pred_nn = rounded
 score_nn = round(accuracy_score(Y_pred_nn, Y_test) * 100, 2)
 print("The accuracy score achieved using Neural Network is: " + str(score_nn) + " %")
+```
 
-####################################################
-##### Compare the accuracy scores of our models ####
-
-scores = [score_lr,score_nb,score_dt,score_xgb,score_nn]
-algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost","Neural Network"]    
-
-for i in range(len(algorithms)):
-    print("The accuracy score achieved using "+algorithms[i]+" is: "+str(scores[i])+" %")
-
-
-#### Plot ####
+#### Reporting the results of our models
+```{python}
+#| echo: false
 from plotnine import ggplot, aes, geom_bar, theme_minimal, labs, scale_fill_cmap
 import matplotlib.cm as cm
 import numpy as np
+
+scores = [score_lr,score_nb,score_dt,score_xgb,score_nn]
+algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost","Neural Network"]    
 
 # Define the custom order (I find it is more tasteful to organise the categories according to their
 # value, it seems to be the default behaviour of bar plots to order categories alphabetically/alphanumerically
@@ -374,7 +427,14 @@ p = (ggplot(df, aes(x="Algorithm", y="Score", fill="Colour"))
 )
 
 print(p)
+```
 
+#### Selecting the best methods based on the accuracy scores
+
+The reason why one would want to consider selecting the results of more than one method are many. For one, the way a given classifier method might choose a given outcome may be affected by specific statistical quirks of each method, for closely scoring methods one may want to see what predicted IDs are common to both methods and which ones aren't in order to better understand what parameters might be more relevant to each model.
+
+```{python}
+#| echo: false
 # Predict labels using XGBoost
 xgb_predicted_labels = xgb_model.predict(X_test)
 
@@ -414,31 +474,14 @@ missing_ids = pd.concat([xgb_missing_ids, dt_missing_ids], ignore_index=True)
 
 # Drop duplicates based on the 'id' column
 missing_ids = missing_ids.drop_duplicates(subset='id')
+```
 
-# Print the resulting DataFrame
-#print(missing_ids)
+#### Visualising differences between the predicted customers common to both models and those that are unique to either model
 
-# Print the top 50 common cases
-#top_50_common_cases = common_high_risk_cases.head(50)
-#print("Top 50 Common Cases:")
-#print(top_50_common_cases)
+##### Plot all high risk cases predicted by both XGBoost and DT models
 
-#output_path = '~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/data/'
-
-# Store the common and missing dataframes as CSV files
-#common_high_risk_cases.to_csv(output_path + 'common_high_risk_cases.csv', index=False)
-#missing_ids.to_csv(output_path + 'missing_ids.csv', index=False)
-#xgb_missing_ids.to_csv(output_path + 'xgb_missing_ids.csv', index=False)
-#dt_missing_ids.to_csv(output_path + 'dt_missing_ids.csv', index=False)
-
-# Now we have an output and the cases which are missing from one algorithm can be scrutinised a little closer, 
-# which when we do shows some differences in the correlation between some features between the full dataset
-# and the dataset after filtering for those cases predicted to be high risk.
-# We also see that the features that matter to predict high risk are the same for both XGBoost and DT models
-# However, there are some differences in the correlation values possibly arising from differences in sensitivity
-# between ensemble models (XGBoost) and those that aren't such as DT Classifiers 
-
-# Plot all high risk cases predicted by both XGBoost and DT models
+```{python}
+#| echo: false
 import plotnine as p9
 from plotnine import aes, geom_tile, geom_label, scale_fill_cmap, theme_minimal, labs, element_text
 import plydata.cat_tools as cat
@@ -488,9 +531,13 @@ p9.theme(
     axis_text_x=element_text(rotation=70, hjust=1),
     figure_size=(8, 6)
 )) 
+```
 
 
-###########
+##### And those predicted by XGBoost but not the Decision Tree Classifier model
+
+```{python}
+#| echo: false
 # Now the missing cases for the DT model (i.e. the ones predicted by XGBoost but not DT)
 
 tidy_corr = df_mis_dt \
@@ -539,8 +586,11 @@ p9.theme(
     figure_size=(8, 6)
 )) 
 
+```
 
-############
+##### Finally those predictions made by the Decision Tree Classifier model but not XGBoost
+```{python}
+#| echo: false
 # And for those predicted by DT but not XGBoost
 tidy_corr = df_mis_xgb \
     .corr() \
@@ -587,3 +637,7 @@ p9.theme(
     axis_text_x=element_text(rotation=70, hjust=1),
     figure_size=(8, 6)
 )) 
+
+```
+
+We can see that the features that matter to predict high risk are the same for both XGBoost and DT models. However, there are some differences in the correlation values possibly arising from differences in sensitivity between ensemble models (XGBoost) and other classifier models such as decision tree classifiers. Whether the sensitivity threshold in making these predictions should be tweaked or not would depend on how much risk can be tolerated but both models perform well, although XGBoost shows marginally better performance.

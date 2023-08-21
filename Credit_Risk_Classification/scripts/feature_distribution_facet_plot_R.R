@@ -5,7 +5,7 @@ library(ggplot2)
 library(viridis)
 
 
-dat = read.csv("./data/plot_df.csv")
+dat = read.csv("~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/data/plot_df.csv")
 dat = dat %>% 
   mutate(feature = fct_reorder(feature, label))
 
@@ -14,7 +14,7 @@ facet_order = unique(dat$feature)
 # Reorder the levels of the factor
 dat$feature = factor(dat$feature, levels = facet_order)
 
-ggplot(dat, aes(y = value, x = feature)) + 
+dist_plot = ggplot(dat, aes(y = value, x = feature)) + 
   geom_violin(aes(fill = feature), 
               stat = "ydensity", 
               position = "dodge", 
@@ -33,4 +33,7 @@ ggplot(dat, aes(y = value, x = feature)) +
   guides(fill = guide_legend(title = "feature")) + 
   ggtitle("Distribution per feature") + 
   xlab("Feature") + ylab("value")
+
+print(dist_plot)
+
 
