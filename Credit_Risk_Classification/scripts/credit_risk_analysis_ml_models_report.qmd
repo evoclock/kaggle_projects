@@ -1,5 +1,5 @@
 ---
-title: "Credit Risk Analysis"
+title: "Credit Risk Analysis - ML models"
 author: "Julen Gamboa"
 date: "21 August 2023"
 format: 
@@ -55,24 +55,24 @@ The data is structured in two csv files:
 
 ## Methodology
 
+I have decided to make a second report where I concentrate on ML models because neural networks offered no significant improvement in accuracy of prediction for far more computational cost.
+
+Below is the amended flowchart
 ```{mermaid}
-flowchart LR
+flowchart TD
   A[Input data] --> B(EDA)
-  B --> C{Analysis proper}
-  C --> D[ML methods]
-  D --> F{Logistic Regression}
-  D --> G{Naive Bayes}
-  D --> H{Decision Tree Classifier}
-  D --> I{XGBoost}
-  C --> E[Neural Network]
-  E --> J{Accuracy assessment}
-  F --> J{Accuracy assessment}
-  G --> J{Accuracy assessment}
-  H --> J{Accuracy assessment}
-  I --> J{Accuracy assessment}
-  J --> K{Reporting}
-  K --> L{Select best two methods}
-  L --> M{Compare common and unique predictions}
+  B --> C{Analysis}
+  C --> D{Logistic Regression}
+  C --> E{Naive Bayes}
+  C --> F{Decision Tree Classifier}
+  C --> G{XGBoost}
+  D --> H{Accuracy assessment}
+  E --> H{Accuracy assessment}
+  F --> H{Accuracy assessment}
+  G --> H{Accuracy assessment}
+  H --> I{Reporting}
+  I --> J{Select best two methods}
+  J --> K{Compare common and unique predictions}
 ```
 
 ### Input data pre-processing
@@ -213,7 +213,7 @@ First thing here is to store the label used to classify a customer as high or lo
 as the response variable for all our models while keeping everything else as our predictor variables
 
 
-### ML methods
+### ML models
 
 Four methods will be used, Logistic Regression (LR), Naive Bayes (NB), a Decision Tree Classifier (DT), and XGBoost (XGB).
 The dataset is split into training and test sets, **70%** is kept for the training set and **30%** will be used as a test set.
@@ -281,13 +281,15 @@ Y_pred_dt = dt.predict(X_test)
 # calculate the accuracy
 score_dt = round(accuracy_score(Y_pred_dt,Y_test)*100, 2)
 
+# Save the DT model
+import pickle
+with open('dt_model.pkl', 'wb') as f:
+    pickle.dump(dt, f)
+
 #####################
 ###### XGBoost XXXXXX
 
 # Save the initial XGBoost model
-import pickle
-with open('model.pkl', 'wb') as f:
-    pickle.dump(dt, f)
 import xgboost as xgb
 
 # Initialize the max accuracy object for hyperparameter tuning
@@ -318,64 +320,11 @@ score_xgb = round(accuracy_score(Y_pred_xgb,Y_test)*100, 2)
 
 # save the trained XGBoost model
 import pickle
-with open('model2.pkl', 'wb') as f:
+with open('xgb_model.pkl', 'wb') as f:
     pickle.dump(xgb_model, f)
 ```
 
-### Accuracy of the ML model predictions
-```{python}
-#| echo: false
-scores = [score_lr,score_nb,score_dt,score_xgb]
-algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost"]    
 
-for i in range(len(algorithms)):
-    print("The accuracy score achieved using "+algorithms[i]+" is: "+str(scores[i])+" %")
-```
-
-### Neural Network approach
-
-I have used a NN model with a full connected hidden layer containing 11 units and ReLu as activation function. The output layer is configured for binary classification.
-
-The model was trained for 3,000 epochs before carrying out predictions on the test set. 
-
-```{python}
-#| echo: false
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense
-
-
-# Build the NN model
-model = Sequential()
-# 11 units on a fully connected hidden layer, the number of input dimensions is the features in our merged_df
-model.add(Dense(11, activation='relu', input_dim=21))
-# output layer for binary classification
-model.add(Dense(1, activation='sigmoid'))
-
-# Compile the NN model
-# configure loss method for binary classification
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-
-# Train the model
-model.fit(X_train, Y_train, epochs=3000)
-
-# Make predictions on the test data with our trained model
-Y_pred_nn = model.predict(X_test)
-```
-
-
-#### Accuracy of the NN model predictions
-
-```{python}
-#| echo: false
-rounded = [round(x[0]) for x in Y_pred_nn]
-Y_pred_nn = rounded
-score_nn = round(accuracy_score(Y_pred_nn, Y_test) * 100, 2)
-print("The accuracy score achieved using Neural Network is: " + str(score_nn) + " %")
-```
 
 #### Reporting the results of our models
 ```{python}
@@ -384,13 +333,13 @@ from plotnine import ggplot, aes, geom_bar, theme_minimal, labs, scale_fill_cmap
 import matplotlib.cm as cm
 import numpy as np
 
-scores = [score_lr,score_nb,score_dt,score_xgb,score_nn]
-algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost","Neural Network"]    
+scores = [score_lr,score_nb,score_dt,score_xgb]
+algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost"]    
 
 # Define the custom order (I find it is more tasteful to organise the categories according to their
 # value, it seems to be the default behaviour of bar plots to order categories alphabetically/alphanumerically
 # regardless of the arguments passed (although in R the forcats library gets around this superbly))
-custom_order = ["XGBoost", "Decision Tree", "Logistic Regression", "Neural Network", "Naive Bayes"]
+custom_order = ["XGBoost", "Decision Tree", "Logistic Regression", "Naive Bayes"]
 
 # Create a DataFrame for plotting
 df = pd.DataFrame({"Algorithm": algorithms, "Score": scores})
@@ -410,9 +359,8 @@ df = df.sort_values("Algorithm")
 
 colour_dict = {
     "XGBoost": "#440154",
-    "Decision Tree": "#3b528b",
-    "Logistic Regression": "#21918c",
-    "Neural Network": "#5ec962",
+    "Decision Tree": "#31688e",
+    "Logistic Regression": "#35b779",
     "Naive Bayes": "#fde725"
 }
 
