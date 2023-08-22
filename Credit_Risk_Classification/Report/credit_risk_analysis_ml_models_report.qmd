@@ -11,9 +11,12 @@ jupyter: python3
 # Aim
 The aim of this analysis is to determine credit risk based on customer behaviour regarding engagement with financial products as well as a variety of demographic attributes that may be informative.
 
+It's worth noting that the dataset already contains information about credit risk
+
 ## Data source
 
 In this analysis I'm using a **Kaggle credit risk dataset** described [here](https://www.kaggle.com/datasets/praveengovi/credit-risk-classification-dataset)
+
 
 The data is structured in two csv files:
 
@@ -32,7 +35,6 @@ The data is structured in two csv files:
 - highest_balance: highest balance in history
 - report_date: date of recent payment
 :::
-
 
 :::{}
 2. File 2 - **Customer data** which contains demographic data and category attributes that have been anonymised as follows:
@@ -57,7 +59,7 @@ I have decided to make a second report where I concentrate on ML models because 
 
 Below is the amended flowchart
 ```{mermaid}
-%%| fig-height: 6.5
+%%| fig-height: 7
 flowchart TD
   A(Input data) --> B(EDA)
   B --> C{Analysis}
@@ -70,15 +72,15 @@ flowchart TD
   F --> H(Accuracy assessment)
   G --> H(Accuracy assessment)
   H --> I["Select best 
-            scoring
-            methods"]
+        scoring
+        methods"]
   I --> J["Common
-             vs
-           Unique 
-        Predictions"]
+    vs
+    Unique 
+    Predictions"]
 ```
 
-#### Input data pre-processing
+### Input data pre-processing
 ```{python}
 #| echo: false
 
@@ -140,25 +142,28 @@ y = merged_df['label']
 merged_df.drop(columns=['label'], axis=1, inplace=True)
 ```
 
-#### Note:
+### Note:
 After some standard pre-processing (renaming columns, concatenating data frames, and checking for missing data) I decided that data imputation was not appropriate while low credit risk customers might pay their full balance or higher amounts consistently on the same date, high risk customers would exhibit far more variance on both the date of balance closing and last payments made. I personally feel the variable 'pay_normal' (i.e. the number of times a customer does not default on payments) captures this information in a discretised manner that does not rely on following a Poisson distribution of events.
 
 In short, I have decided that dropping update_date, and report_date variables was justified. I did however use KNN imputation to fill missing values for feature_2, prod_limit (the credit limit), and highest_balance features, the data for feature 2 appears to be normally distributed, while the prod_limit appears to be close to normally distributed but has a small number of outliers. The highest_balance variable exhibits most values centered close to zero but extremely long tail all the way out  to 150,000,000. 
 
+##### No missing values present after pre-processing
+```{python}
+merged_df.info()
+```
+
+
 It would be good to visualise how the different variables correlate with one another.
+
+*Technical note: The plot was generated with plotnine following Tidyverse principles which I find to be superior to Python libraries*
 
 ```{python}
 #| echo: false
 #| fig-cap: "Correlation between different variables in the credit risk customer dataset"
 
-import warnings
 import plotnine as p9
 from plotnine import aes, geom_tile, geom_label, scale_fill_cmap, theme_minimal, labs, element_text
 import plydata.cat_tools as cat
-
-# Filter out specific warning types
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 tidy_corr = merged_df \
     .corr() \
@@ -212,7 +217,8 @@ p9.theme(
 First thing here is to store the label used to classify a customer as high or low credit risk and store it
 as the response variable for all our models while keeping everything else as our predictor variables
 
-#### ML models
+
+### ML models
 
 Four methods will be used, Logistic Regression (LR), Naive Bayes (NB), a Decision Tree Classifier (DT), and XGBoost (XGB).
 The dataset is split into training and test sets, **70%** is kept for the training set and **30%** will be used as a test set.
@@ -324,19 +330,14 @@ with open('xgb_model.pkl', 'wb') as f:
 ```
 
 
+
 #### Reporting the results of our models
 ```{python}
 #| echo: false
 #| fig-cap: "Model performance - accuracy of predictions"
-
-import warnings
 from plotnine import ggplot, aes, geom_bar, theme_minimal, labs, scale_fill_cmap
 import matplotlib.cm as cm
 import numpy as np
-
-# Filter out specific warning types
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 scores = [score_lr,score_nb,score_dt,score_xgb]
 algorithms = ["Logistic Regression","Naive Bayes","Decision Tree","XGBoost"]    
@@ -429,7 +430,6 @@ missing_ids = pd.concat([xgb_missing_ids, dt_missing_ids], ignore_index=True)
 missing_ids = missing_ids.drop_duplicates(subset='id')
 ```
 
-
 #### Visualising differences between the predicted customers common to both models and those that are unique to either model
 
 ##### Plot all high risk cases predicted by both XGBoost and DT models
@@ -445,14 +445,9 @@ df_mis = pd.read_csv ('~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/d
 df_mis_xgb = pd.read_csv('~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/data/xgb_missing_ids.csv')
 df_mis_dt = pd.read_csv('~/Desktop/DS/kaggle_projects/Credit_Risk_Classification/data/dt_missing_ids.csv')
 
-import warnings
 import plotnine as p9
 from plotnine import aes, geom_tile, geom_label, scale_fill_cmap, theme_minimal, labs, element_text
 import plydata.cat_tools as cat
-
-# Filter out specific warning types
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 tidy_corr = df_com \
     .corr() \
@@ -501,18 +496,13 @@ p9.theme(
 )) 
 ```
 
+
 ##### And those predicted by XGBoost but not the Decision Tree Classifier model
 
 ```{python}
 #| echo: false
 #| fig-cap: "Correlation plot - high risk customers predicted by XGBoost alone"
 # Now the missing cases for the DT model (i.e. the ones predicted by XGBoost but not DT)
-
-import warnings
-
-# Filter out specific warning types
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 tidy_corr = df_mis_dt \
     .corr() \
@@ -562,18 +552,11 @@ p9.theme(
 
 ```
 
-##### Finally, those predictions made by the Decision Tree Classifier model but not XGBoost
+##### Finally those predictions made by the Decision Tree Classifier model but not XGBoost
 ```{python}
 #| echo: false
 #| fig-cap: "Correlation plot - high risk customers predicted by DT model alone"
 # And for those predicted by DT but not XGBoost
-
-import warnings
-
-# Filter out specific warning types
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
-
 tidy_corr = df_mis_xgb \
     .corr() \
     .melt(
